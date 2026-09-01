@@ -40,9 +40,4 @@ yarn-error.*
 /ios
 
 # Android Studio and Gradle local/generated state
-/android/.gradle/
-/android/.idea/
-/android/gradle/gradle-daemon-jvm.properties
-/android/build/
-/android/app/build/
-/android/local.properties
+/android
