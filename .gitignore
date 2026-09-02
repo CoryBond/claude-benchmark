@@ -41,3 +41,5 @@ yarn-error.*
 
 # Android Studio and Gradle local/generated state
 /android
+
+.idea
