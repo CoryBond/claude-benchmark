@@ -14,7 +14,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { Message, Role, Conversation } from './src/types';
-import { runMessages, ApiError } from './src/api';
+import { runMessages, ApiError, maxOutputTokensForModel } from './src/api';
 import { loadApiKey, saveApiKey, saveConversation } from './src/storage';
 import MessageRow from './src/components/MessageRow';
 import SettingsModal from './src/components/SettingsModal';
@@ -38,7 +38,7 @@ export default function App() {
 
   const [system, setSystem] = useState('');
   const [model, setModel] = useState(MODEL_OPTIONS[0]);
-  const [maxTokens, setMaxTokens] = useState('1024');
+  const [maxTokens, setMaxTokens] = useState(String(maxOutputTokensForModel(MODEL_OPTIONS[0])));
   const [temperature, setTemperature] = useState('1');
 
   const [messages, setMessages] = useState<Message[]>([
@@ -58,6 +58,11 @@ export default function App() {
   }, []);
 
   const hasKey = apiKey.trim().length > 0;
+
+  function handleModelChange(nextModel: string) {
+    setModel(nextModel);
+    // setMaxTokens(String(maxOutputTokensForModel(nextModel)));
+  }
 
   function updateContent(id: string, content: string) {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
@@ -91,20 +96,42 @@ export default function App() {
     }
     setError(null);
     setLoading(true);
+    const assistantId = makeId();
+    let streamStarted = false;
     try {
       const result = await runMessages({
         apiKey,
         model: model.trim(),
         system,
         messages,
-        maxTokens: parseInt(maxTokens, 10) || 1024,
+        maxTokens: parseInt(maxTokens, 10) || maxOutputTokensForModel(model),
         temperature: temperature.trim() === '' ? NaN : parseFloat(temperature),
+        onDelta: (textSoFar) => {
+          if (!streamStarted) {
+            streamStarted = true;
+            setMessages((prev) => [
+              ...prev,
+              { id: assistantId, role: 'assistant', content: textSoFar },
+            ]);
+          } else {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: textSoFar } : m))
+            );
+          }
+        },
       });
-      setMessages((prev) => [
-        ...prev,
-        { id: makeId(), role: 'assistant', content: result.text },
-      ]);
+      if (!streamStarted) {
+        // No deltas ever arrived (shouldn't normally happen if text is non-empty,
+        // but guards against an edge case where the stream produced nothing).
+        setMessages((prev) => [
+          ...prev,
+          { id: assistantId, role: 'assistant', content: result.text },
+        ]);
+      }
       setUsage(result.usage);
+      if (result.stopReason === 'max_tokens') {
+        setError('Response was cut off (hit max tokens). Raise "Max tokens" for a full reply.');
+      }
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Something went wrong.';
       setError(message);
@@ -143,7 +170,7 @@ export default function App() {
   function handleLoadConversation(conversation: Conversation) {
     setSystem(conversation.system);
     setModel(conversation.model);
-    setMaxTokens(conversation.maxTokens);
+    // setMaxTokens(conversation.maxTokens);
     setTemperature(conversation.temperature);
     setMessages(conversation.messages);
     setError(`Loaded "${conversation.name}"`);
@@ -156,8 +183,8 @@ export default function App() {
         <StatusBar style="dark" />
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
         >
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Claude Bench</Text>
@@ -175,13 +202,14 @@ export default function App() {
             style={styles.flex}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
           >
             <Text style={styles.sectionLabel}>MODEL</Text>
             <View style={styles.chipRow}>
               {MODEL_OPTIONS.map((option) => (
                 <Pressable
                   key={option}
-                  onPress={() => setModel(option)}
+                  onPress={() => handleModelChange(option)}
                   style={[styles.chip, model === option && styles.chipActive]}
                 >
                   <Text style={[styles.chipText, model === option && styles.chipTextActive]}>
@@ -193,7 +221,7 @@ export default function App() {
             <TextInput
               style={styles.modelInput}
               value={model}
-              onChangeText={setModel}
+              onChangeText={handleModelChange}
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="model string"
@@ -243,7 +271,7 @@ export default function App() {
             ))}
 
             <Pressable style={styles.addButton} onPress={addMessage}>
-              <Text style={styles.addButtonText}>+ Add message</Text>
+              <Text style={styles.addButtonText}>+ Add mess2age</Text>
             </Pressable>
 
             {error && (
