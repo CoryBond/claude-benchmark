@@ -92,7 +92,9 @@ project root, `npx expo run:android` builds, installs, starts Metro, and
 launches the app on your selected device in one step — no need to open
 Android Studio at all for routine runs.
 
-## Installing on your phone
+## Debugging on your phone
+
+To debug on a physical phone the app can be built in a 'debug' version for a quick installation on a phone. The debug version doesn't bake in the full JS bundle (no metro server) so it can not be used outside of a USB tether to the computer.
 
 **Option A — direct from Android Studio (fastest for active development):**
 1. On the phone: Settings → About phone → tap "Build number" seven times to
@@ -109,6 +111,21 @@ cd android
 The APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`.
 Transfer it to the phone any way you like (email, cloud drive, USB file
 copy, or `adb install app-debug.apk` over USB), then on the phone: enable
+"Install unknown apps" for whichever app you used to open the file (Settings
+→ Apps → Special access → Install unknown apps), and tap the APK to install.
+
+## Installing full release of the app, on your phone
+
+Building the full release verison of the app can be installed on a phone without tethering the phone to the computer.
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+The APK lands at `android/app/build/outputs/apk/release/app-release.apk`.
+Transfer it to the phone any way you like (email, cloud drive, USB file
+copy, or `adb install app-release.apk` over USB), then on the phone: enable
 "Install unknown apps" for whichever app you used to open the file (Settings
 → Apps → Special access → Install unknown apps), and tap the APK to install.
 
